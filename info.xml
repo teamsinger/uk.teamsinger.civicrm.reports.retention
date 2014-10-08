@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<extension key="uk.teamsinger.civicrm.reports.retention" type="module">
+  <file>retention</file>
+  <name>Retention Report</name>
+  <description>Retention Report</description>
+  <license>MIT</license>
+  <maintainer>
+    <author>Tom Singer</author>
+    <email>tomsinger@gmail.com</email>
+  </maintainer>
+  <releaseDate>2014-10-07</releaseDate>
+  <version>1.0</version>
+  <develStage>alpha</develStage>
+  <compatibility>
+    <ver>4.2</ver>
+  </compatibility>
+  <comments>Retention report</comments>
+  <civix>
+    <namespace>CRM/Retention</namespace>
+  </civix>
+</extension>
