@@ -47,6 +47,8 @@ class CRM_Retention_Form_Report_Retention extends CRM_Report_Form {
   protected $_customGroupExtends = array('Membership', 'Contribution');
   protected $_customGroupGroupBy = FALSE;
 
+  protected $_runQuery = FALSE;
+
   function __construct() {
 
     // Check if CiviCampaign is a) enabled and b) has active campaigns
@@ -396,7 +398,8 @@ mark as pseudofield and then add to _whereClauses overriding buildQuery as Form/
 
     $report_type = CRM_Utils_Array::value("teamsinger_retention_report_type_value", $this->_params);
 
-    if ($report_type == 'have_renewed') {
+    if ($report_type == 'have_renewed' && !$this->_runQuery) {
+      $this->_runQuery = TRUE;
       $original_from = new DateTime($from);
       $original_from->add(new DateInterval('P1Y'));
       $from = $original_from->format('YmdHis');
