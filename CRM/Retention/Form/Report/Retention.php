@@ -250,8 +250,6 @@ mark as pseudofield and then add to _whereClauses overriding buildQuery as Form/
             'options' => CRM_Contribute_PseudoConstant::contributionStatus(),
             'type' => CRM_Utils_Type::T_INT,
           ),
-          'total_amount' =>
-          array('title' => ts('Contribution Amount')),
         ),
         'grouping' => 'contri-fields',
       ),
