@@ -59,6 +59,23 @@ class CRM_Retention_Form_Report_Retention extends CRM_Report_Form {
     }
 
     $this->_columns = array(
+      'teamsinger_retention_report_type' =>
+      array(
+        'filters' =>
+        array(
+          'teamsinger_retention_report_type' =>
+          array(
+            'pseudofield' => 'true',
+            'name' => 'teamsinger_retention_report_type',
+            'title' => ts('Report Type'),
+            'operatorType' => CRM_Report_Form::OP_SELECT,
+            'options' => array(
+              'not_yet_renewed' => 'Have Not Yet Renewed',
+              'have_renewed' => 'Have Renewed'
+            ),
+          ),
+        ),
+      ),
       'civicrm_contact' =>
       array(
         'dao' => 'CRM_Contact_DAO_Contact',
@@ -102,24 +119,6 @@ class CRM_Retention_Form_Report_Retention extends CRM_Report_Form {
             'title' => ts('Contact SubType'),
           ),
         ),
-        'filters' =>
-        array(
-          'sort_name' =>
-          array('title' => ts('Contact Name'),
-            'operator' => 'like',
-          ),
-          'id' =>
-          array('no_display' => TRUE),
-        ),
-        'order_bys' =>
-        array(
-          'sort_name' => array(
-            'title' => ts('Last Name, First Name'),
-            'default' => '1',
-            'default_weight' => '0',
-            'default_order' => 'ASC'
-          ),
-        ),
         'grouping' => 'contact-fields',
       ),
       'civicrm_membership' =>
@@ -144,15 +143,14 @@ class CRM_Retention_Form_Report_Retention extends CRM_Report_Form {
           'source' => array('title' => 'Source'),
         ),
         'filters' => array(
-          'join_date' =>
-          array('operatorType' => CRM_Report_Form::OP_DATE),
-          'membership_start_date' =>
-          array('operatorType' => CRM_Report_Form::OP_DATE),
+/*
+mark as pseudofield and then add to _whereClauses overriding buildQuery as Form/Member/ContributionDetail.php does?
+*/
+
           'membership_end_date' =>
-          array('operatorType' => CRM_Report_Form::OP_DATE),
-          'owner_membership_id' =>
-          array('title' => ts('Membership Owner ID'),
-            'operatorType' => CRM_Report_Form::OP_INT,
+          array(
+            'title' => 'Membership Renewal Due',
+            'operatorType' => CRM_Report_Form::OP_DATE
           ),
           'tid' =>
           array(
@@ -246,27 +244,6 @@ class CRM_Retention_Form_Report_Retention extends CRM_Report_Form {
         ),
         'filters' =>
         array(
-          'receive_date' =>
-          array('operatorType' => CRM_Report_Form::OP_DATE),
-          'financial_type_id' =>
-          array('title' => ts('Financial Type'),
-            'operatorType' => CRM_Report_Form::OP_MULTISELECT,
-            'options' => CRM_Contribute_PseudoConstant::financialType(),
-            'type' => CRM_Utils_Type::T_INT,
-          ),
-          'payment_instrument_id' =>
-          array('title' => ts('Payment Type'),
-            'operatorType' => CRM_Report_Form::OP_MULTISELECT,
-            'options' => CRM_Contribute_PseudoConstant::paymentInstrument(),
-            'type' => CRM_Utils_Type::T_INT,
-          ),
-          'currency' =>
-          array('title' => 'Currency',
-            'operatorType' => CRM_Report_Form::OP_MULTISELECT,
-            'options' => CRM_Core_OptionGroup::values('currencies_enabled'),
-            'default' => NULL,
-            'type' => CRM_Utils_Type::T_STRING,
-          ),
           'contribution_status_id' =>
           array('title' => ts('Contribution Status'),
             'operatorType' => CRM_Report_Form::OP_MULTISELECT,
@@ -279,8 +256,8 @@ class CRM_Retention_Form_Report_Retention extends CRM_Report_Form {
         'grouping' => 'contri-fields',
       ),
     );
-    $this->_groupFilter = TRUE;
-    $this->_tagFilter = TRUE;
+//    $this->_groupFilter = TRUE;
+//    $this->_tagFilter = TRUE;
 
   // If we have active campaigns add those elements to both the fields and filters
     if ($campaignEnabled && !empty($this->activeCampaigns)) {
@@ -301,7 +278,7 @@ class CRM_Retention_Form_Report_Retention extends CRM_Report_Form {
   }
 
   function preProcess() {
-    $this->assign('reportTitle', ts('Membership Detail Report'));
+    $this->assign('reportTitle', ts('Retention Report'));
     parent::preProcess();
   }
 
@@ -396,28 +373,43 @@ class CRM_Retention_Form_Report_Retention extends CRM_Report_Form {
   }
 
   function orderBy() {
-    $this->_orderBy = " ORDER BY {$this->_aliases['civicrm_contact']}.sort_name, {$this->_aliases['civicrm_contact']}.id, {$this->_aliases['civicrm_membership']}.membership_type_id";
+    $this->_orderBy = " ORDER BY {$this->_aliases['civicrm_membership']}.end_date";
 
     if ($this->_contribField) {
       $this->_orderBy .= ", {$this->_aliases['civicrm_contribution']}.receive_date DESC";
     }
   }
 
-  function postProcess() {
+  function getFromTo($relative, $from, $to, $fromtime = NULL, $totime = NULL) {
+    if (empty($totime)) {
+      $totime = '235959';
+    }
+    //FIX ME not working for relative
+    if ($relative) {
+      list($term, $unit) = CRM_Utils_System::explode('.', $relative, 2);
+      $dateRange = CRM_Utils_Date::relativeToAbsolute($term, $unit);
+      $from = substr($dateRange['from'], 0, 8);
+      //Take only Date Part, Sometime Time part is also present in 'to'
+      $to = substr($dateRange['to'], 0, 8);
+    }
 
-    $this->beginPostProcess();
+    $from = CRM_Utils_Date::processDate($from, $fromtime);
+    $to = CRM_Utils_Date::processDate($to, $totime);
 
-    // get the acl clauses built before we assemble the query
-    $this->buildACLClause($this->_aliases['civicrm_contact']);
-    $sql = $this->buildQuery(TRUE);
+    $report_type = CRM_Utils_Array::value("teamsinger_retention_report_type_value", $this->_params);
 
-    $rows = array();
-    $this->buildRows($sql, $rows);
+    if ($report_type == 'have_renewed') {
+      $original_from = new DateTime($from);
+      $original_from->add(new DateInterval('P1Y'));
+      $from = $original_from->format('YmdHis');
+      $original_to = new DateTime($to);
+      $original_to->add(new DateInterval('P1Y'));
+      $to = $original_to->format('YmdHis');
+    }
 
-    $this->formatDisplay($rows);
-    $this->doTemplateAssignment($rows);
-    $this->endPostProcess($rows);
+    return array($from, $to);
   }
+
 
   function alterDisplay(&$rows) {
     // custom code to alter rows
