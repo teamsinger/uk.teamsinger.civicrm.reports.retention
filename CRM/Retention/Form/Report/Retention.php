@@ -162,6 +162,11 @@ mark as pseudofield and then add to _whereClauses overriding buildQuery as Form/
             'operatorType' => CRM_Report_Form::OP_MULTISELECT,
             'options' => CRM_Member_PseudoConstant::membershipType(),
           ),
+          'status_id' =>
+          array('title' => ts('Membership Status'),
+            'operatorType' => CRM_Report_Form::OP_MULTISELECT,
+            'options' => CRM_Member_PseudoConstant::membershipStatus(NULL, NULL, 'label'),
+          ),
         ),
         'grouping' => 'member-fields',
       ),
